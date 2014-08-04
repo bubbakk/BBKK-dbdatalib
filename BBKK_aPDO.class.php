@@ -124,6 +124,26 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
     protected $last_exception = null;
 
 
+
+
+
+
+
+
+
+
+    /*
+     * Method: __construct
+     */
+    public function __construct()
+    {
+        // explicit parent constructor call
+        parent::__construct();
+    }
+
+
+
+
     /*
      * Method: open_connection
      *   *[abstract public]* open the connection to database/DBMS

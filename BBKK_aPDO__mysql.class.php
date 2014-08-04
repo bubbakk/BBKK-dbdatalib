@@ -45,6 +45,14 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
     const MYSQL_CONN_OPEN_ERROR     = 200; // 200+ are about connection
 
     /*
+     * Constant: default MySQL server TCP port
+     *
+     */
+    const DEFAULT_TCP_PORT = 3306;
+
+
+
+    /*
      * Property: const_messages
      *   *[private]* {array} messages corresponding to error codes
      */
@@ -58,7 +66,7 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
 
 
 
-    const DEFAULT_TCP_PORT = 3306;
+
 
     /*
      * Method: __construct
@@ -67,8 +75,17 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      */
     public function __construct()
     {
+        // set dependencies
+        $func = "bk2l_array__replace_values";
+        $type = BBKK_BaseClass::DEP_FUNCTIONS;
+        $this->dependencies_add($func, $type);
+
+        // set defaults
         $this->tcp_port = BBKK_aPDO__mysql::DEFAULT_TCP_PORT;
         $this->charset  = 'UTF8';
+
+        // explicit parent constructor call
+        parent::__construct();
     }
 
 
@@ -89,11 +106,9 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      */
     public function open_connection()
     {
-        // building parameters with defaults
-        $var_names           = array('override_user', 'override_pass');
-        $default_vals        = array(null, null);
-        $values_and_defaults = array_replace($default_vals, func_get_args());
-        $keys_values         = array_combine($var_names, $values_and_defaults);
+        // reading arguments
+        $vars_defs = array('override_user' => null, 'override_pass' => null);
+        $keys_values = bk2l_array__replace_values($vars_defs, func_get_args());
         extract($keys_values);
 
 
