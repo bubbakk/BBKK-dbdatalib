@@ -51,7 +51,7 @@ function bk2l_array__replace_values($varnames_and_defaults = array(),
 {
     // checks
     if ( true ) {
-        if ( !isset($replace_values[0]) ) {
+        if ( !is_array($replace_values) ) {
             trigger_error("second argument must be an array");
         }
         if ( !is_array($varnames_and_defaults) ) {
