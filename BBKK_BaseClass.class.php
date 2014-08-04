@@ -39,11 +39,26 @@
 class BBKK_BaseClass
 {
 
+    /*
+     * Method: __construct
+     *   initialize log properties, check dependecies
+     */
+    public function __construct()
+    {
+        //$this->error_log_file  = $this->application_base_path . '/';
+        //$this->error_log_file .= BBKK_BaseClass::DEFAULT_LOG_FILE_NAME;
+
+        $this->dependencies_check();
+    }
+
+
+
+
 
 //
 // DEPENDENCIES SUBSYSTEM: properties, constants and methods
 //
-    protected $dependencies = array();
+    private $dependencies = array();
 
     /*
      * Constants: valori dei possibili controlli delle dipendenze.
@@ -54,6 +69,7 @@ class BBKK_BaseClass
      */
     const DEP_FUNCTIONS  = 'functions';
     const DEP_CLASSES    = 'classes';
+
 
     /*
      * Method: dependencies_add
@@ -70,16 +86,15 @@ class BBKK_BaseClass
      */
     protected function dependencies_add($deps = '', $type = '')
     {
-        if ( $type !== DEP_FUNCTIONS && $type !== DEP_CLASSES) {
-            $err_type = BBKK_BaseClass::ERR_PROGRAMMING;
-            $err_code = BBKK_BaseClass::ERR__PARM_NOT_VLD_VL;
-            $this->manage_error($err_type, $err_code);
+        $t_func = BBKK_BaseClass::DEP_FUNCTIONS;
+        $t_clas = BBKK_BaseClass::DEP_CLASSES;
+
+        if ( $type !== $t_func && $type !== $t_clas ) {
+            $this->trigger_base_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP);
         }
 
-        if ( !is_string($deps) || !is_array($deps) ) {
-            $err_type = BBKK_BaseClass::ERR_PROGRAMMING;
-            $err_code = BBKK_BaseClass::ERR__PARM_NOT_VLD_VL;
-            $this->manage_error($err_type, $err_code);
+        if ( !is_string($deps) && !is_array($deps) ) {
+            $this->trigger_base_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_VL);
         }
 
         // append the dependency
@@ -95,6 +110,7 @@ class BBKK_BaseClass
         }
     }
 
+
     /*
      * Method: check_dependencies
      *   *[protected]* Effettua una verifica delle dipendenze: funzioni e classi
@@ -104,31 +120,26 @@ class BBKK_BaseClass
      */
     protected function dependencies_check()
     {
-//        $this->DEBUG_CALL( __CLASS__, __METHOD__, func_get_args());
-
-
-        if ( isset($dependencies_list[GEN_BaseClass::DEP_FUNCTIONS]) )
-        {
-            $checks = $dependencies_list[GEN_BaseClass::DEP_FUNCTIONS];
-            foreach ($checks as $function)
-            {
+        if ( isset($this->dependencies[BBKK_BaseClass::DEP_FUNCTIONS]) ) {
+            $checks = $this->dependencies[BBKK_BaseClass::DEP_FUNCTIONS];
+            foreach ($checks as $function) {
                 if ( !function_exists($function) ) {
-                    $error_text = 'la funzione ' . $function . ' non è definita';
-                    $this->setError($error_text, E_USER_ERROR);
-                    return false;
+                    $err_code = BBKK_BaseClass::ERR__DEP_FUNC_NOT_FND;
+                    $err_text = $this->base_errors_list[$err_code] . ': '.
+                                $function;
+                    $this->trigger_base_err($err_text);
                 }
             }
         }
 
-        if ( isset($dependencies_list[GEN_BaseClass::DEP_CLASSES]) )
-        {
-            $checks = $dependencies_list[GEN_BaseClass::DEP_CLASSES];
-            foreach ($checks as $class)
-            {
+        if ( isset($this->dependencies[BBKK_BaseClass::DEP_CLASSES]) ) {
+            $checks = $this->dependencies[BBKK_BaseClass::DEP_CLASSES];
+            foreach ($checks as $class) {
                 if ( !class_exists($class) ) {
-                    $error_text = 'la classe ' . $class . ' non è definita';
-                    $this->setError($error_text, E_USER_ERROR);
-                    return false;
+                    $err_code = BBKK_BaseClass::ERR__DEP_CLASS_NOT_FND;
+                    $err_text = $this->base_errors_list[$err_code] . ': '.
+                                $function;
+                    $this->trigger_base_err($err_text);
                 }
             }
         }
@@ -159,6 +170,20 @@ class BBKK_BaseClass
 
 
     /*
+     * Constants: error codes
+     *
+     * ERR__ATTR_NOT_FND        - attribute not found
+     * ERR__ATTR_NOT_VLD_VL     - attribute not valid value
+     */
+    const ERR__ATTR_NOT_FND         = 0;
+    const ERR__ATTR_NOT_VLD_VL      = 1;
+    const ERR__PARM_NOT_VLD_VL      = 10;
+    const ERR__PARM_NOT_VLD_TYP     = 11;
+    const ERR__DEP_FUNC_NOT_FND     = 20;
+    const ERR__DEP_CLASS_NOT_FND    = 21;
+
+
+    /*
      * Property: $base_errors_list
      *   {array} error codes and messages
      *
@@ -171,21 +196,20 @@ class BBKK_BaseClass
      */
     protected $base_errors_list =
               // Attribute not found
-        array(  0  => 'attribute not found',
-                1  => 'attribute has not a valid value',
-                10 => 'parameter value is not valid',
-                11 => 'parameter type is not valid' );
+        array(  BBKK_BaseClass::ERR__ATTR_NOT_FND       =>
+                    'attribute not found'               ,
+                BBKK_BaseClass::ERR__ATTR_NOT_VLD_VL    =>
+                    'attribute has not a valid value'   ,
+                BBKK_BaseClass::ERR__PARM_NOT_VLD_VL    =>
+                    'parameter value is not valid'      ,
+                BBKK_BaseClass::ERR__DEP_FUNC_NOT_FND   =>
+                    'parameter type is not valid'       ,
+                BBKK_BaseClass::ERR__DEP_FUNC_NOT_FND   =>
+                    'dependency function not found'     ,
+                BBKK_BaseClass::ERR__DEP_CLASS_NOT_FND  =>
+                    'dependency class not found'
+        );
 
-    /*
-     * Constants: error codes
-     *
-     * ERR__ATTR_NOT_FND        - attribute not found
-     * ERR__ATTR_NOT_VLD_VL     - attribute not valid value
-     */
-    const ERR__ATTR_NOT_FND         = 0;
-    const ERR__ATTR_NOT_VLD_VL      = 1;
-    const ERR__PARM_NOT_VLD_VL      = 10;
-    const ERR__PARM_NOT_VLD_TYP     = 11;
 
     /*
      * Constants: error types
@@ -198,22 +222,13 @@ class BBKK_BaseClass
     const ERR_USER_WARNING     = 1;
     const ERR_USER_ERROR       = 2;
 
+
+
+
+
     public function get_last_error_message()
     {
         return $this->last_error_message;
-    }
-
-
-
-
-    /*
-     * Method: __construct
-     *   initialize properties
-     */
-    public function __construct()
-    {
-        $this->error_log_file = $this->application_base_path . '/';
-        $this->error_log_file .= BBKK_BaseClass::DEFAULT_LOG_FILE_NAME;
     }
 
 
@@ -227,8 +242,23 @@ class BBKK_BaseClass
      * See:
      *   <BBKK_BaseClass.$error_list>
      */
-    protected function trigger_base_err($err_code) {
-        $this->trigger_err($this->base_errors_list[$err_code], E_USER_ERROR);
+    protected function trigger_base_err($err_code)
+    {
+        // set message and check
+        if ( is_integer($err_code) ) {
+            $err_msg = $this->base_errors_list[$err_code];
+        }
+        else
+            if ( is_string($err_code) ) {
+                $err_msg = $err_code;
+            }
+            else {
+                $err_code = BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP;
+                $err_msg = $this->base_errors_list[$err_code];
+                $this->trigger_err($err_msg);
+            }
+
+        $this->trigger_err($err_msg);
     }
 
 
@@ -253,6 +283,23 @@ class BBKK_BaseClass
                 print "\n**triggering error**: {$msg}\n";
         }
     }
+//
+// END ERROR MANAGEMET SUBSYSTEM
+//
+
+
+
+
+
+
+//
+// LOG SUBSYSTEM
+//
+    /*
+     * Const: DEFAULT_LOG_FILE_NAME
+     *   default value for log file name
+     */
+    const DEFAULT_LOG_FILE_NAME = "application.log";
 
 
     /*
@@ -265,11 +312,16 @@ class BBKK_BaseClass
         error_log($message, 3, $this->error_log_file);
     }
 
+    /*
+     * Method: __set
+     *   magic setter method
+     */
     public function __set($attr_name, $value)
     {
-        $err = $this->base_errors_list[BBKK_BaseClass::ERR__ATTR_NOT_FND];
-        trigger_error($err, E_USER_ERROR);
+        $this->trigger_base_err(BBKK_BaseClass::ERR__ATTR_NOT_FND);
     }
-
+//
+// END LOG SUBSYSTEM
+//
 }
 ?>
