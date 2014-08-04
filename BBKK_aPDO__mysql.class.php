@@ -43,6 +43,7 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      */
     const MYSQL_CANT_CREATE_DB      = 102;
     const MYSQL_CONN_OPEN_ERROR     = 200; // 200+ are about connection
+    const MYSQL_CONN_TCP_HOST_ERR   = 201; // 200+ are about connection
 
     /*
      * Constant: default MySQL server TCP port
@@ -61,7 +62,9 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
             BBKK_aPDO__mysql::MYSQL_CANT_CREATE_DB     =>
                 'can\'t create MySQL database',
             BBKK_aPDO__mysql::MYSQL_CONN_OPEN_ERROR    =>
-                'error opening MySQL database connection'
+                'error opening MySQL database connection',
+            BBKK_aPDO__mysql::MYSQL_CONN_TCP_HOST_ERR    =>
+                'host not set'
         );
 
 
@@ -110,6 +113,17 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
         $vars_defs = array('override_user' => null, 'override_pass' => null);
         $keys_values = bk2l_array__replace_values($vars_defs, func_get_args());
         extract($keys_values);
+
+
+
+        // checks
+        if ( true ) {
+            if ( $this->hostname === '' ) {
+                $err_code = BBKK_aPDO__mysql::MYSQL_CONN_TCP_HOST_ERR;
+                $err_msg  = $this->const_messages[$err_code];
+                $this->trigger_err($err_msg);
+            }
+        }
 
 
 
@@ -178,23 +192,25 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      */
     public function create_database()
     {
-        // building parameters with defaults
-        $var_names           = array('if_not_exists', 'adm_user', 'adm_pass');
-        $default_vals        = array(false, '', '');
-        $values_and_defaults = array_replace($default_vals, func_get_args());
-        $keys_values         = array_combine($var_names, $values_and_defaults);
+        // reading arguments
+        $vars_defs = array('if_not_exists'  => false,
+                           'adm_user'       => '',
+                           'adm_pass'       => ''   );
+        $keys_values = bk2l_array__replace_values($vars_defs, func_get_args());
         extract($keys_values);
+
+
 
         // checks
         if (true) {
             if ( $if_not_exists !== true && $if_not_exists !== false ) {
-                $this->trigger_usr_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP);
+                $this->trigger_base_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP);
             }
             if ( !is_string($adm_user) ) {
-                $this->trigger_usr_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP);
+                $this->trigger_base_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP);
             }
             if ( !is_string($adm_pass) ) {
-                $this->trigger_usr_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP);
+                $this->trigger_base_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP);
             }
         }
 
