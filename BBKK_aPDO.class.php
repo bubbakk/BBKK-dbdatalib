@@ -269,7 +269,7 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
     {
         switch($attr_name)
         {
-            case 'host'    :
+            case 'hostname':
             case 'port'    :
             case 'db_name' :
             case 'username':
