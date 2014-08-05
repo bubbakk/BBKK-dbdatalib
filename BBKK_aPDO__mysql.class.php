@@ -42,8 +42,9 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      *
      */
     const MYSQL_CANT_CREATE_DB      = 102;
-    const MYSQL_CONN_OPEN_ERROR     = 200; // 200+ are about connection
-    const MYSQL_CONN_TCP_HOST_ERR   = 201; // 200+ are about connection
+    const MYSQL_CONN_OPEN_ERR       = 200; // 200+ are about connection
+    const MYSQL_CONN_TCP_HOST_ERR   = 201;
+    const MYSQL_CONN_SOCKF_NOT_SET  = 202;
 
     /*
      * Constant: default MySQL server TCP port
@@ -58,13 +59,15 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      *   *[private]* {array} messages corresponding to error codes
      */
     private $const_messages =
-        array(// DBMS not supported
-            BBKK_aPDO__mysql::MYSQL_CANT_CREATE_DB     =>
+        array(
+            BBKK_aPDO__mysql::MYSQL_CANT_CREATE_DB          =>
                 'can\'t create MySQL database',
-            BBKK_aPDO__mysql::MYSQL_CONN_OPEN_ERROR    =>
+            BBKK_aPDO__mysql::MYSQL_CONN_OPEN_ERROR         =>
                 'error opening MySQL database connection',
-            BBKK_aPDO__mysql::MYSQL_CONN_TCP_HOST_ERR    =>
-                'host not set'
+            BBKK_aPDO__mysql::MYSQL_CONN_TCP_HOST_ERR       =>
+                'host not set',
+            BBKK_aPDO__mysql::MYSQL_CONN_SOCKF_NOT_SET      =>
+                'socket file not set: review mysql.default_socket in php.ini'
         );
 
 
@@ -73,8 +76,13 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
 
     /*
      * Method: __construct
-     *   set default values for charset and TCP port
+     *   set default values
      *
+     * Details:
+     *   defaults are:
+     *     - tcp_port: 3306 (constant <BBKK_aPDO__mysql.DEFAULT_TCP_PORT>)
+     *     - type: TCP connection <BBKK_aPDO.CONN_VIA_TCP>
+     *     - charset: 'UTF-8'
      */
     public function __construct()
     {
@@ -85,6 +93,7 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
 
         // set defaults
         $this->tcp_port = BBKK_aPDO__mysql::DEFAULT_TCP_PORT;
+        $this->type     = BBKK_aPDO::CONN_VIA_TCP;
         $this->charset  = 'UTF8';
 
         // explicit parent constructor call
@@ -98,7 +107,10 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      *
      * Details:
      *    parameters are not explicit (hidden) because PHP methods can't be
-     *    explicitly overloaded     *
+     *    explicitly overloaded
+     *
+     *    Socket connetion uses socket name set in php.ini. <More informations
+     *    at http://it2.php.net/manual/it/ref.pdo-mysql.php>
      *
      * Parameters:
      *   $override_user {string} - override class property username
@@ -128,7 +140,23 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
 
 
         // open connection
-        $dsn  = 'mysql:host=' . $this->hostname . ';port=' . $this->tcp_port;
+        $dsn = 'mysql:';
+        // TCP
+        if ( $this->type === BBKK_aPDO::CONN_VIA_TCP ) {
+            $dsn .= 'host=' . $this->hostname . ';port=' . $this->tcp_port;
+        }
+        // socket
+        else {
+            $socket_file = ini_get('pdo_mysql.default_socket');
+            if ( $socket_file !== '' ) {
+                $dsn .= 'unix_socket=' . $socket_file;
+            }
+            else {
+                $err_code = BBKK_aPDO__mysql::MYSQL_CONN_SOCKF_NOT_SET;
+                $err_msg  = $this->const_messages[$err_code];
+                $this->trigger_err($err_msg);
+            }
+        }
         // user and password
         $user = $this->username;
         $pass = $this->password;
@@ -171,8 +199,8 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      *   *[public]* create a new database
      *
      * Details:
-     *    parameters are not explicit (hidden) because PHP methods can't be
-     *    explicitly overloaded
+     *    method parameters are not explicit (hidden) because PHP methods
+     *    can't be explicitly overloaded
      *
      * Parameters:
      *   $if_not_exists - add clause "IF NOT EXISTS" to CREATE DATABASE SQL
@@ -182,7 +210,8 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
      *   $adm_pass      - $adm_user's password (default: '')
      *
      * Returns:
-     *   {bool} TRUE if database is successfully created, FALSE otherwise.
+     *   {bool} TRUE if database is successfully created or already exists if
+     *   the first parameter passed is TRUE, FALSE otherwise.
      *
      * TODO:
      *   add grant privileges with using something like this:
