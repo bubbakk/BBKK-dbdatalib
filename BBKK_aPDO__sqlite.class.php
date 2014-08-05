@@ -61,8 +61,23 @@ class BBKK_aPDO__sqlite extends BBKK_aPDO
 
 
 
+
+
+    /*
+     * Method: __construct
+     *   set default values
+     *
+     * Details:
+     *   defaults are:
+     *     - type: TCP connection <BBKK_aPDO.CONN_VIA_FILE>
+     */
     public function __construct()
-    {    }
+    {
+        $this->type = BBKK_aPDO::CONN_VIA_FILE;
+
+        // explicit parent constructor call
+        parent::__construct();
+    }
 
 
 
