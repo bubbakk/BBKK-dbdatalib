@@ -48,6 +48,21 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
     const CONN_ALREADY_OPN             = 101;  // connections messages
 
     /*
+     * Constants: DBMS connection "medium"
+     *
+     * CONN_VIA_FILE    - connect through a file (generally only for SQLite)
+     * CONN_VIA_TCP     - TCP connection
+     * CONN_VIA_SOCKET  - fastest local connection (when supported)
+     *
+     *
+     */
+    const CONN_VIA_FILE     = 1;
+    const CONN_VIA_TCP      = 2;
+    const CONN_VIA_SOCKET   = 4;
+
+
+
+    /*
      * Property: const_messages
      *   *[private]* {array} messages corresponding to error codes
      */
@@ -75,7 +90,7 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
      *   *[protected]* {string} database name. *For SQLite* set this property to
      *   /absolutepath/to/sqlitedb.sqlite
      */
-    protected $db_name = '';
+    protected $db_name  = '';
 
     /*
      * Property: $username
@@ -88,6 +103,12 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
      *   *[protected]* {string} user's password
      */
     protected $password = '';
+
+    /*
+     * Property: $type
+     *   *[protected]* {int} sets connection type: file, TCP or socket
+     */
+    protected $type     = 0;
 
     /*
      * Property: $hostname
@@ -112,7 +133,7 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
      *   <PHP supported charsets at
      *    http://php.net/manual/it/mbstring.supported-encodings.php>
      */
-    protected $charset = '';
+    protected $charset  = '';
 
 
 
@@ -271,11 +292,12 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
         {
             case 'hostname':
             case 'port'    :
+            case 'type'    :
             case 'db_name' :
             case 'username':
             case 'password':
             case 'charset' :
-            case 'schema' :
+            case 'schema'  :
                 $this->$attr_name = $value;
                 break;
             default:
@@ -324,209 +346,6 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
  */
 class BBKK_aPDO_OLD extends BBKK_BaseClass
 {
-
-    /*
-     * Property: $error_messages
-     *   *[private]* {array} error codes and messages
-     *
-     * Description:
-     *   error ranges are:
-     *   - 101 - 120: strict DBMS parameters error (such as db_type or
-     *     connection_type)
-     *   - 121 - 131: connection layer network error (such as not valid domain
-     *     or port, or SQLite file path not found)
-     * See also:
-     *   <BBKK_BaseClass.$base_errors_list>
-     */
-    private $errors_list =
-        array(// DBMS not supported
-              101 => 'connection already open'                               ,
-              // connection not supported
-              102 => 'Wrong connection type. Please use constats \
-                      CONNECTION_*'                                          ,
-              // connection type for PostreSQL not supported
-              103 => 'The connection type requested for the selected \
-                      DBMS is not supported. Connection types allowed for \
-                      PostgreSQL are BBKK_aPDO.CONNECTION_SOCKET and \
-                      BBKK_aPDO.CONNECTION_TCP'                              ,
-              // connection type for MySQL not supported or not yet implemented
-              104 => 'The connection type requested for the selected \
-                      DBMS is not supported. The only connection type \
-                      allowed for MySQL is BBKK_aPDO.CONNECTION_TCP'         ,
-              // connection type for SQLite not supported
-              105 => 'The connection type requested for the selected \
-                      DBMS is not supported. The only connection type \
-                      allowed  for SQLite is BBKK_aPDO.CONNECTION_FILE'      ,
-              // only absolute path for SQLite database file
-              106 => 'File path for SQLite database file must be absolute'   ,
-              // connection already established
-              107 => 'A connection is already open. Can\'t open a new one'   ,
-
-              121 => 'Host not valid'                                        ,
-              122 => 'TCP port not valid');
-
-
-    /*
-     * Constants: error codes
-     *
-     * ERR__DBMS_NOT_SPPRTD     - DBMS not supported
-     */
-    const CONN_ALREADY_OPN             = 101;  // connection errors
-
-    const ERR__CONN_TYPE_NOT_SPPRTD         = 102;
-
-    const ERR__PGSQL_CONN_TYPE_NOT_SPPRTD   = 103;
-    const ERR__MYSQL_CONN_TYPE_NOT_SPPRTD   = 104;
-    const ERR__SQLITE_CONN_TYPE_NOT_SPPRTD  = 105;
-    const ERR__SQLITE_ONLY_ABSPATH_DBFILE   = 106;
-
-    const ERR_TCP_HOST_NOT_VLD              = 121;
-    const ERR_TCP_PORT_NOT_VLD              = 122;
-
-
-
-
-    /*
-     * Method: open_connection
-     *   *[public]* open the connection to specified DBMS
-     *
-     * Description:
-     *   This method wraps specific class private [DBMS]_connect methods.
-     *
-     *   If parameters are not set correctly or the connection can't be
-     *   established, FALSE is returned and public attribute
-     *   <BBKK_aPDO.$user_warning_message> is set to custom or driver text
-     *   message.
-     *
-     * Returns:
-     *   {bool} TRUE if the connection to database is established correctly,
-     *   FALSE otherwise
-     *
-     * See also:
-     *   <BBKK_aPDO.mysql_connect>, <BBKK_aPDO.sqlite_connect>,
-     *   <BBKK_aPDO.postresql_connect>, <BBKK_aPDO.$user_warning_message>
-     *
-     */
-    public function open_connection()
-    {
-        // do checks
-        if (true) {
-            // connection already open
-            if ( is_a($this->pdo, 'PDO') || $this->pdo !== null ) {
-                trigger_error(
-                    $this->errors_list[self::ERR__CONN_ALREADY_OPN],
-                    E_USER_ERROR);
-            }
-        }
-
-        switch ($this->db_type)
-        {
-            case self::DBMS_MYSQL:
-                return $this->mysql_connect();
-            case self::DBMS_SQLITE:
-                return $this->sqlite_connect();
-            case self::DBMS_POSTGRESQL:
-                return $this->postgresql_connect();
-            default:
-                trigger_error($this->errors_list[self::ERR__DBMS_NOT_SPPRTD],
-                              E_USER_ERROR);
-                break;
-        }
-
-        return false;
-    }
-
-
-    /*
-     * Method: close_connection
-     *   close database connection
-     *
-     * Details:
-     *   not always is possible to close the connection. Please refer to
-     *   <http://us3.php.net/manual/en/pdo.connections.php#114822>
-     *
-     *   The attribute that handles DBMS connection is checked before
-     *   attempting to close it.
-     *
-     * Returns:
-     *   {bool} TRUE if the close operations are performed, FALSE if not
-     */
-    public function close_connection()
-    {
-        // check if connection is active
-        if ( !is_a($this->pdo, 'PDO') ) {
-            trigger_error($this->error_messages[ERR_CONN_NOT_OPND],
-                          E_USER_WARNING);
-            return false;
-        }
-
-        switch ($this->db_type)
-        {
-            case self::DBMS_POSTGRESQL:
-                // force the connection termination server-side
-                $this->pdo->query('SELECT pg_terminate_backend(pg_backend_pid());');
-                $this->pdo = null;
-                break;
-            case self::DBMS_MYSQL:
-            case self::DBMS_SQLITE:
-                $this->pdo = null;
-                break;
-        }
-
-        return true;
-    }
-
-
-
-    public function create_database($if_not_exists = false,
-                                    $adm_user = '',
-                                    $adm_passwd = '')
-    {
-        switch ($this->db_type)
-        {
-            case self::DBMS_MYSQL:
-                return $this->mysql_create_database($if_not_exists,
-                                                    $adm_user,
-                                                    $adm_passwd);
-                break;
-            case self::DBMS_SQLITE:
-                return $this->sqlite_create_database($if_not_exists);
-                break;
-            case self::DBMS_POSTGRESQL:
-                //return $this->postgresql_create_database($if_not_exists);
-                break;
-            default:
-                trigger_error($this->errors_list[self::ERR__DBMS_NOT_SPPRTD],
-                              E_USER_ERROR);
-                break;
-        }
-
-        return false;
-    }
-
-
-
-    /*
-        private function sqlite_create_database($if_not_exists = false)
-        {
-            if (true) {
-                if ( $if_not_exists=== true && $if_not_exists === false ) {
-                    $this->trigger_usr_err(BBKK_BaseClass::ERR__PARM_NOT_VLD_TYP);
-                }
-            }
-        }
-    */
-
-
-
-
-
-
-
-
-
-
-
 
     /*
      * Method: postgresql_connect
@@ -642,88 +461,7 @@ class BBKK_aPDO_OLD extends BBKK_BaseClass
     {
     }
 
-    /*
-     * Method: sqlite_connect
-     *   *[private]* connect to a SQLite database
-     *
-     * Description:
-     *   SQLite is a little different from other DBMS, because... it is not a
-     *   DBMS. Connect to such a database means to open a data file, and there
-     *   is no server to connect to.
-     *
-     * Return:
-     *   {bool} TRUE if the connection is opened, FALSE otherwise
-     *
-     * See also:
-     *   <GEN_PDO.openConnection>, <GEN_PDO.$connection_type>,
-     *   <GEN_PDO.$db_name>
-     */
-    private function sqlite_connect()
-    {
-        // checks
-        if ( true ) {
-            if ( $this->connection_type !== BBKK_aPDO::CONNECTION_FILE ) {
-                $err_msg_id = BBKK_aPDO::ERR__SQLITE_CONN_TYPE_NOT_SPPRTD;
-                $err_msg = $this->error_messages[$err_msg_id];
-                trigger_error($err_msg, E_USER_ERROR);
-                return false;
-            }
 
-            if ( substr($this->db_name, 0, 1) !== '/' ) {
-                $err_msg_id = BBKK_aPDO::ERR__SQLITE_ONLY_ABSPATH_DBFILE;
-                $err_msg = $this->error_messages[$err_msg_id];
-                trigger_error($err_msg, E_USER_ERROR);
-                return false;
-            }
-        }
-
-        // create DSN string
-        $dsn =  'sqlite:' . $this->db_name;
-
-        // try connection
-        try {
-            $this->pdo = new PDO($dsn);
-        }
-        catch (PDOException $e) {
-            $this->user_warning_message = 'error opening SQLite database ' .
-                                          'connection: ' . $e->getMessage();
-            return false;
-        }
-
-        return true;
-    }
-
-
-
-
-
-
-
-
-    /*
-     *
-     *
-     *
-    private function pdo_mysql_connect()
-    {
-        // check properties
-        // TODO
-
-        try
-        {
-            $this->dbh = new PDO('mysql:host='.$this->host.';
-            dbname='.$this->dbname, $this->username, $this->password);
-        }
-        catch (PDOException $e)
-        {
-            $this->set_error($e->getMessage(), __METHOD__, __LINE__);
-            $this->error_type = E_ERROR;
-            return false;
-        }
-
-        return true;
-    }
-*/
 /*
     private function pdo_sqlite_connect()
     {
@@ -742,28 +480,4 @@ class BBKK_aPDO_OLD extends BBKK_BaseClass
     }
 */
 
-
-
-
-
-
-    /*
-     * Method: check_connection_parameters
-     *   verify if all basic connection parameters are correctly set
-     *
-     * Returns:
-     *   {bool} TRUE if all parameters are correctly set, FALSE if not
-     *
-     */
-/*
-    private function check_connection_parameters()
-    {
-        // check selected database type
-
-        // check selected connection type according to database type and
-        // implementations
-
-        // for tcp connection type, check host and port
-    }
-*/
 }
