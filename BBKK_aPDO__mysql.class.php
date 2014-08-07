@@ -255,26 +255,26 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
         // create database
         $if_not_exists_clause = '';
         if ( $if_not_exists ) $if_not_exists_clause = ' IF NOT EXISTS';
+        $query = 'CREATE DATABASE ' . $if_not_exists_clause . ' ' .
+                 '`' . $this->db_name . '`'                       .
+                 'CHARACTER SET ' . strtolower($this->charset);
         try {
-            $query = 'CREATE DATABASE ' . $if_not_exists_clause . ' ' .
-                     '`' . $this->db_name . '` '                      .
-                     'CHARACTER SET ' . strtolower($this->charset);
-
             $res = $this->pdo->exec($query);
-            if ( !$res )
-            {
-                $err_data = $this->pdo->errorInfo();
-                $this->last_exception = $err_data;
-                $msg_id = BBKK_aPDO__mysql::MYSQL_CANT_CREATE_DB;
-                $msg = $this->const_messages[$msg_id] . ": " . $err_data[2];
-                $this->last_error_message = $msg;
-                return false;
-            }
         }
         catch (PDOException $e) {
             $this->last_exception = $e;
             $msg_id = BBKK_aPDO__mysql::MYSQL_CONN_OPEN_ERROR;
             $msg = $this->const_messages[$msg_id] . ": " . $e->getMessage();
+            $this->last_error_message = $msg;
+            return false;
+        }
+
+        if ( !$res )
+        {
+            $err_data = $this->pdo->errorInfo();
+            $this->last_exception = $err_data;
+            $msg_id = BBKK_aPDO__mysql::MYSQL_CANT_CREATE_DB;
+            $msg = $this->const_messages[$msg_id] . ": " . $err_data[2];
             $this->last_error_message = $msg;
             return false;
         }
