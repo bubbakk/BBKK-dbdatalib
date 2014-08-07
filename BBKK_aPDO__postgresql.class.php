@@ -41,6 +41,7 @@ class BBKK_aPDO__postgresql extends BBKK_aPDO
      *
      */
     const PGSQL_DB_NM_NSET        = 101; // 100+ are about database
+    const PGSQL_CANT_CREATE_DB    = 102;
     const PGSQL_CONN_OPEN_ERR     = 200; // 200+ are about connection
     const PGSQL_CONN_TCP_HOST_ERR = 201;
 
@@ -64,6 +65,8 @@ class BBKK_aPDO__postgresql extends BBKK_aPDO
      */
     private $const_messages =
         array(
+            BBKK_aPDO__postgresql::PGSQL_CANT_CREATE_DB      =>
+                'can\'t create PostgreSQL database',
             BBKK_aPDO__postgresql::PGSQL_DB_NM_NSET          =>
                 'database name is not correctly set or empty',
             BBKK_aPDO__postgresql::PGSQL_CONN_OPEN_ERR       =>
@@ -259,39 +262,38 @@ class BBKK_aPDO__postgresql extends BBKK_aPDO
         if ( !$this->open_connection($adm_user, $adm_pass) ) {
             return false;
         }
+        $this->db_name = $buffer_db_name;
+        $this->schema  = $buffer_schema;
 
 
 
         // create database
         $db_exists = $this->database_exists();
-
-        die("continua qui!");
-        /*
-        if ( $if_not_exists )
-        try {
-            $query = 'CREATE DATABASE ' . $if_not_exists_clause . ' ' .
-                '`' . $this->db_name . '` '                      .
-                'CHARACTER SET ' . strtolower($this->charset);
-
-            $res = $this->pdo->exec($query);
-            if ( !$res )
+        if ( !$db_exists )
+        {
+            // execute query
+            $query = 'CREATE DATABASE "' . $this->db_name . '"';
+            try {
+                $res = $this->pdo->exec($query);
+            }
+            catch (PDOException $e) {
+                $this->last_exception = $e;
+                $msg_id = BBKK_aPDO__postgresql::PGSQL_CONN_OPEN_ERR;
+                $msg = $this->const_messages[$msg_id] . ": " . $e->getMessage();
+                $this->last_error_message = $msg;
+                return false;
+            }
+            // check result
+            if ( $res === false )
             {
                 $err_data = $this->pdo->errorInfo();
                 $this->last_exception = $err_data;
-                $msg_id = BBKK_aPDO__mysql::MYSQL_CANT_CREATE_DB;
+                $msg_id = BBKK_aPDO__postgresql::PGSQL_CANT_CREATE_DB;
                 $msg = $this->const_messages[$msg_id] . ": " . $err_data[2];
                 $this->last_error_message = $msg;
                 return false;
             }
         }
-        catch (PDOException $e) {
-            $this->last_exception = $e;
-            $msg_id = BBKK_aPDO__mysql::MYSQL_CONN_OPEN_ERROR;
-            $msg = $this->const_messages[$msg_id] . ": " . $e->getMessage();
-            $this->last_error_message = $msg;
-            return false;
-        }
-        */
 
         return true;
     }
@@ -339,7 +341,7 @@ class BBKK_aPDO__postgresql extends BBKK_aPDO
         $stmt = $this->pdo->query($query);
         $col0_rows = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
 
-        return ( $col0_rows[0] === "0" && !isset($col0_rows[1]) );
+        return !( $col0_rows[0] === "0" && !isset($col0_rows[1]) );
     }
 
 
