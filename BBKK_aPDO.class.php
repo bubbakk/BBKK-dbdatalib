@@ -305,6 +305,82 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
                 break;
         }
     }
+
+
+
+    /*
+     * Method: parse_def
+     *   {public} Parse table definition file
+     *
+     * Returns:
+     *   {array} containing structured generic data for table and fields
+     *   definition
+     *
+     * See:
+     *   please read [definition format documentation at http://goo.gl/AdAQ6H]
+     */
+    public function parse_def($def_file_content)
+    {
+        $TABLE = array('header' => array(), 'body' => array());
+        $TH    = $TABLE['header'];
+        $TB    = $TABLE['body'];
+
+        $func_trim = function($row){return trim($row);};
+
+
+
+        // split sections
+        $sections = explode("\n\n", $def_file_content);
+        $table_def  = $sections[0];
+        $table_flds = $sections[1];
+        unset($sections);
+
+
+
+        // TABLE parser
+        $table_lines = explode("\n", $table_def);
+        $table_lc    = count($table_lines);
+        // table name
+        preg_match("[\w+]", $table_lines[0], $matches);
+        if ( $matches[0] === "" ) die('can\'t parse table name');
+        $TH['table_name'] = $matches[0];
+        // table name delimiter
+        preg_match("[-+]", $table_lines[1], $matches);
+        if ( $matches[0] === "" ) die('can\'t parse table name delimiter');
+        // search for primary key fields
+        $last_line     = $table_lines[$table_lc - 1];
+        $first_char_ls = substr($last_line, 0, 1);
+        $last_char_ls  = substr($last_line, -1, 1);
+        $pkey_found    = false;
+        if ( $first_char_ls === '[' && $last_char_ls === ']') {
+            $pkey_fields = explode(',', substr($last_line, 1, -1));
+            $pkey_found  = true;
+            $pkey_fields = array_map($func_trim, $pkey_fields); // trim fields
+            $TH['pkeys'] = $pkey_fields;
+        }
+        else $TH['pkeys'] = '';
+
+        // description
+        if ($pkey_found) $last_desc_idx = $table_lc - 2;
+        else             $last_desc_idx = $table_lc - 1;
+        if ( $last_desc_idx >= 2 ) {
+            $desc_array = $table_lines;
+            unset($desc_array[0], $desc_array[1]);
+            if ( $pkey_found ) unset($desc_array[$table_lc - 1]);
+
+            $desc_array = array_map($func_trim, $desc_array);   // trim lines
+            $desc_text  = implode(' ', $desc_array);
+            $TH['description'] = $desc_text;
+        }
+        else $TH['description'] = '';
+
+        //$TH['table_pkey'] = $table_lines[$table_lc - 1];
+        //if ( substring($TH['table_pkey'],0,1) !== "[" ) die("")
+
+
+
+        // FIELDS parser
+    }
 }
 
 
