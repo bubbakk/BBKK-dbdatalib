@@ -62,7 +62,7 @@ class BBKK_aPDO__mysql extends BBKK_aPDO
         array(
             BBKK_aPDO__mysql::MYSQL_CANT_CREATE_DB          =>
                 'can\'t create MySQL database',
-            BBKK_aPDO__mysql::MYSQL_CONN_OPEN_ERROR         =>
+            BBKK_aPDO__mysql::MYSQL_CONN_OPEN_ERR           =>
                 'error opening MySQL database connection',
             BBKK_aPDO__mysql::MYSQL_CONN_TCP_HOST_ERR       =>
                 'host not set',
