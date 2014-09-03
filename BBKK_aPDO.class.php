@@ -146,6 +146,19 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
 
 
 
+    private $parser_field_templates = array();
+
+
+    private $parser_data_types = array(
+        'bool',
+        'smallint', 'integer', 'int', 'bigint',
+        'serial', 'bigserial',
+        'real', 'double',
+        'char', 'varchar', 'text',
+        'date', 'time', 'timestamp', 'timestampz',
+        'binary'
+    );
+
 
 
 
@@ -309,28 +322,35 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
 
 
     /*
-     * Method: parse_def
-     *   {public} Parse table definition file
-     *
-     * Returns:
-     *   {array} containing structured generic data for table and fields
-     *   definition
-     *
-     * See:
-     *   please read [definition format documentation at http://goo.gl/AdAQ6H]
-     */
-    public function parse_def($def_file_content)
+         * Method: parse_def
+         *   {public} Parse table definition file
+         *
+         * Parameters:
+         *   $def_file_content {string} - definition text file to parse
+         *                                (default = '')
+         *
+         * TODO:
+         *   - template parser
+         *
+         * Returns:
+         *   {array} containing structured generic data for table and fields
+         *   definition
+         *
+         * See:
+         *   please read [definition format documentation at http://goo.gl/AdAQ6H]
+         */
+    public function parse_def($def_file_content = '')
     {
         $TABLE = array('header' => array(), 'body' => array());
-        $TH    = $TABLE['header'];
-        $TB    = $TABLE['body'];
+        $TH    = &$TABLE['header'];
+        $TB    = &$TABLE['body'];
 
         $func_trim = function($row){return trim($row);};
 
 
 
         // split sections
-        $sections = explode("\n\n", $def_file_content);
+        $sections = explode("\n\n\n", $def_file_content);
         $table_def  = $sections[0];
         $table_flds = $sections[1];
         unset($sections);
@@ -374,12 +394,110 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
         }
         else $TH['description'] = '';
 
-        //$TH['table_pkey'] = $table_lines[$table_lc - 1];
-        //if ( substring($TH['table_pkey'],0,1) !== "[" ) die("")
-
 
 
         // FIELDS parser
+        $fields_lines = explode("\n", $table_flds);
+        $fields_lc    = count($fields_lines);
+        $fields_names = array();
+        // starting parser, line by line
+        for ( $i = 0 ; $i < $fields_lc ; $i++ )
+        {
+            $f_line = $fields_lines[$i];
+
+            // field name with or without field template
+            // start with nothing preceding the field name
+            preg_match("/^[\w]+/", $f_line, $matches);  // start with no w-spcs
+            if ( count($matches) === 1 )
+            {
+                // reset field data
+                $field = array();
+
+                // field parameters recognition
+                $field_name_or_desc = $matches[0];
+
+                // check for field name duplication
+                if ( in_array($field_name_or_desc, $fields_names) )
+                    die('duplicate field name');
+
+                //$fields_lines[] = $field_name_or_desc;
+
+                $field['name'] = $field_name_or_desc;
+
+                // template ?
+                $t_name = '';
+                preg_match("/^[\w]+ +< +([\w]+)/", $f_line, $matches);
+                if ( count($matches) === 2 ) {
+                    $t_name = $matches[1];
+                    //if ( !isset($this->parser_field_templates[$t_name]) )
+                    //    die('template "' . $t_name . '" not found');
+                    //$field = $field + $this->parser_field_templates[$t_name];
+                    $field['template'] = $t_name;
+                }
+                //var_dump($matches);
+            }
+
+
+            // description
+            // start with a ';' character, eventually with whitespaces before
+            preg_match("/[[:blank:]]*;(.*)/", $f_line, $matches);
+            if ( count($matches) > 1 ) {
+                $field['description'] = $matches[1];
+            }
+
+
+            // all other data
+            // start with a '.' character, eventually with whitespaces before
+            $grp1 = '[[:blank:]]*\.([\w-_]*)'; // word, no spaces
+            $grp2 = '[[:blank:]]*\((\d+)\)'; // digit in round parenthesis
+            $grp3 = '[[:blank:]]*\[(.+)\]'; // anything in squared parenthesis
+            preg_match("/$grp1$grp2$grp3/", $f_line, $matches);
+            if ( count($matches) > 0 )
+            {
+                // not null
+                $nn1 = ($matches[0] === 'not-null');
+                $nn2 = ($matches[0] === 'not_null');
+                $nn3 = ($matches[0] === 'notnull');
+                if ( $nn1 || $nn2 || $nn3 ) {
+                    $field['not null'] = true;
+                }
+                // unique
+                elseif ( $matches[0] === 'unique' ) {
+                    $field['unique'] = true;
+                }
+                // data type
+                elseif ( in_array($matches[1], $this->parser_data_types) )
+                {
+                    $field['data type'] = $matches[1];
+                    // length
+                    if ( isset($matches[2]) ) {
+                        $field['length'] = $matches[2];
+                    }
+                    // default
+                    if ( isset($matches[3]) ) {
+                        $field['default'] = $matches[3];
+                    }
+                }
+            }
+
+            if ( $f_line === '' ) {
+                $TB[] = $field;
+                //var_dump($field);
+            }
+        }
+
+        //var_dump($TABLE);
+
+        return $TABLE;
+    }
+
+
+
+    public function parse_template($template_file_content = '')
+    {
+        $this->parser_field_templates = array();
+
+
     }
 }
 
