@@ -322,24 +322,20 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
 
 
     /*
-         * Method: parse_def
-         *   {public} Parse table definition file
-         *
-         * Parameters:
-         *   $def_file_content {string} - definition text file to parse
-         *                                (default = '')
-         *
-         * TODO:
-         *   - template parser
-         *
-         * Returns:
-         *   {array} containing structured generic data for table and fields
-         *   definition
-         *
-         * See:
-         *   please read [definition format documentation at http://goo.gl/AdAQ6H]
-         */
-    public function parse_def($def_file_content = '')
+     * Method: parse_table_def
+     *   {public} Parse table definition
+     *
+     * Parameters:
+     *   $def_content {string} - definition data to parse (default = '')
+     *
+     * Returns:
+     *   {array} containing structured generic data for table and fields
+     *   definition
+     *
+     * See:
+     *   please read [definition format documentation at http://goo.gl/AdAQ6H]
+     */
+    public function parse_table_def($def_content = '')
     {
         $TABLE = array('header' => array(), 'body' => array());
         $TH    = &$TABLE['header'];
@@ -350,7 +346,7 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
 
 
         // split sections
-        $sections = explode("\n\n\n", $def_file_content);
+        $sections = explode("\n\n\n", $def_content);
         $table_def  = $sections[0];
         $table_flds = $sections[1];
         unset($sections);
@@ -362,7 +358,7 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
         $table_lc    = count($table_lines);
         // table name
         preg_match("[\w+]", $table_lines[0], $matches);
-        if ( $matches[0] === "" ) die('can\'t parse table name');
+        if ( $matches[0] === "" ) die('can\'t find table name');
         $TH['table_name'] = $matches[0];
         // table name delimiter
         preg_match("[-+]", $table_lines[1], $matches);
@@ -403,6 +399,9 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
         // starting parser, line by line
         for ( $i = 0 ; $i < $fields_lc ; $i++ )
         {
+            // avoid match test if line role is found
+            $token_found = false;
+
             $f_line = $fields_lines[$i];
 
             // field name with or without field template
@@ -410,19 +409,21 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
             preg_match("/^[\w]+/", $f_line, $matches);  // start with no w-spcs
             if ( count($matches) === 1 )
             {
+                $token_found = true;
+
                 // reset field data
                 $field = array();
 
                 // field parameters recognition
-                $field_name_or_desc = $matches[0];
+                $field_name = $matches[0];
 
-                // check for field name duplication
-                if ( in_array($field_name_or_desc, $fields_names) )
+                // check field name duplication
+                if ( in_array($field_name, $fields_names) )
                     die('duplicate field name');
 
                 //$fields_lines[] = $field_name_or_desc;
 
-                $field['name'] = $field_name_or_desc;
+                $field['name'] = $field_name;
 
                 // template ?
                 $t_name = '';
@@ -437,67 +438,168 @@ abstract class BBKK_aPDO extends BBKK_BaseClass
                 //var_dump($matches);
             }
 
-
-            // description
-            // start with a ';' character, eventually with whitespaces before
-            preg_match("/[[:blank:]]*;(.*)/", $f_line, $matches);
-            if ( count($matches) > 1 ) {
-                $field['description'] = $matches[1];
-            }
-
-
-            // all other data
-            // start with a '.' character, eventually with whitespaces before
-            $grp1 = '[[:blank:]]*\.([\w-_]*)'; // word, no spaces
-            $grp2 = '[[:blank:]]*\((\d+)\)'; // digit in round parenthesis
-            $grp3 = '[[:blank:]]*\[(.+)\]'; // anything in squared parenthesis
-            preg_match("/$grp1$grp2$grp3/", $f_line, $matches);
-            if ( count($matches) > 0 )
+            // field block parameters
+            if ( !$token_found )
             {
-                // not null
-                $nn1 = ($matches[0] === 'not-null');
-                $nn2 = ($matches[0] === 'not_null');
-                $nn3 = ($matches[0] === 'notnull');
-                if ( $nn1 || $nn2 || $nn3 ) {
-                    $field['not null'] = true;
-                }
-                // unique
-                elseif ( $matches[0] === 'unique' ) {
-                    $field['unique'] = true;
-                }
-                // data type
-                elseif ( in_array($matches[1], $this->parser_data_types) )
-                {
-                    $field['data type'] = $matches[1];
-                    // length
-                    if ( isset($matches[2]) ) {
-                        $field['length'] = $matches[2];
-                    }
-                    // default
-                    if ( isset($matches[3]) ) {
-                        $field['default'] = $matches[3];
-                    }
-                }
+                $this->parse_block_parameters($f_line, $field);
             }
 
+            // if nothing is found (empty line) the field block is completed
             if ( $f_line === '' ) {
                 $TB[] = $field;
-                //var_dump($field);
             }
         }
-
-        //var_dump($TABLE);
 
         return $TABLE;
     }
 
 
 
-    public function parse_template($template_file_content = '')
+    /*
+     * Method: parse_template_def
+     *   {public} Parse template definition
+     *
+     * Parameters:
+     *   $def_content {string} - definition data to parse (default = '')
+     *
+     * Returns:
+     *   {array} containing structured generic data for table and fields
+     *   definition
+     *
+     * See:
+     *   please read [definition format documentation at http://goo.gl/AdAQ6H]
+     */
+    public function parse_template_def($def_content = '')
     {
         $this->parser_field_templates = array();
 
+        // FIELDS parser
+        $template_lines = explode("\n", $def_content);
+        $template_lc    = count($template_lines);
+        $template_names = array();
+        // starting parser, line by line
+        for ( $i = 0 ; $i < $template_lc ; $i++ )
+        {
+            // avoid match test if line role is found
+            $token_found = false;
 
+            $t_line = $template_lines[$i];
+
+            // template block name
+            // start with nothing preceding the name itself
+            $beginchar_regex = '/^[\w]+/';
+            preg_match($beginchar_regex, $t_line, $matches);  // start with no w-spcs
+            if ( count($matches) === 1 )
+            {
+                $token_found = true;
+
+                // reset template data
+                $template = array();
+
+                // template name
+                $template_name = $matches[0];
+
+                // check template name duplication
+                if ( in_array($template_name, $template_names) )
+                    die('duplicate template name');
+
+                //$fields_lines[] = $field_name_or_desc;
+
+                $template['name'] = $template_name;
+            }
+
+            // template block parameters
+            if ( !$token_found )
+            {
+                $this->parse_block_parameters($t_line, $template);
+            }
+
+            // if nothing is found (empty line) the block is completed
+            if ( $t_line === '' ) {
+                $this->parser_field_templates[] = $template;
+            }
+        }
+
+        return $this->parser_field_templates;
+    }
+
+
+
+    /*
+     * Method: parse_block_parameters
+     *   {private} Parse details blocks
+     *
+     * Parameters:
+     *   $target {string}    - string to parse (default = '')
+     *   &$res   {array ref} - the array where to save results
+     *                         (default = array())
+     *
+     * Returns:
+     *   {bool} TRUE if parsing is done FALSE otherwise (parameters error)
+     *
+     * See:
+     *   <BBKK_aPDO.parse_table_def>, <BBKK_aPDO.parse_template_def>
+     */
+    private function parse_block_parameters($target = '', &$res = array())
+    {
+        if ( !is_string($target) )  return false;
+        if ( !is_array($res) )      return false;
+
+        // description
+        // begin with a semi-colon character eventually preceded by whitespaces
+        $semicolon_reges = '[[:blank:]]*;[[:blank:]]*(.*)';
+        preg_match("/$semicolon_reges/", $target, $matches);
+        if ( count($matches) > 1 ) {
+            $res['description'] = $matches[1];
+            return;
+        }
+
+        // field details
+        // begin with a full stop eventually preceded by whitespaces
+        $period_regex = '[[:blank:]]*\.[[:blank:]]*([\w-_]*)';
+        preg_match("/$period_regex/", $target, $matches);
+        if ( count($matches) > 0 )
+        {
+            // case non-sensitive
+            $word_found = strtolower($matches[1]);
+
+            // modifier: NOT NULL
+            $nn1 = ($word_found === 'not-null');
+            $nn2 = ($word_found === 'not_null');
+            $nn3 = ($word_found === 'notnull');
+            if ( $nn1 || $nn2 || $nn3 ) {
+                $res['not null'] = true;
+            }
+            // modifier: UNIQUE
+            elseif ( $word_found === 'unique' ) {
+                $res['unique'] = true;
+            }
+            // data type
+            elseif ( in_array($word_found, $this->parser_data_types) )
+            {
+                $res['data type'] = $word_found;
+
+                // optional
+                // field length
+                // digit in round parenthesis
+                $digitinrndparen_regex = '\((\d+)\)';
+                preg_match("/$digitinrndparen_regex/", $target, $matches);
+                if ( count($matches) > 0 ) {
+                    $res['length'] = $matches[1];
+                }
+
+                // optional
+                // field default value
+                // any string in squared parenthesis
+                $anystringinsqparen_regex = '\[(.+)\]';
+                preg_match("/$anystringinsqparen_regex/", $target, $matches);
+                if ( count($matches) > 0 ) {
+                    $res['default'] = $matches[1];
+                }
+            }
+        }
+
+        return true;
     }
 }
 
